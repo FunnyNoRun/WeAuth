@@ -3,3 +3,4 @@ target/
 .vscode/
 .vs/
 .claude/
+node_modules/
