@@ -59,7 +59,9 @@ export default function App() {
                                 <span>我是开发者</span>
                             </button>
 
-                            <button className="group relative px-8 py-4 bg-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-500 hover:-translate-y-1 hover:shadow-emerald-500/40 transition-all flex items-center space-x-2">
+                            <button
+                                onClick={() => setCurrentView("bot")}
+                                className="group relative px-8 py-4 bg-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-500 hover:-translate-y-1 hover:shadow-emerald-500/40 transition-all flex items-center space-x-2">
                                 <Bot className="w-5 h-5" />
                                 <span>用于机器人</span>
                             </button>
@@ -70,6 +72,26 @@ export default function App() {
 
             {currentView === "developer" && (
                 <AuthFlowView onBack={() => setCurrentView("home")} />
+            )}
+
+            {currentView === "bot" && (
+                <div className="w-full max-w-3xl px-4 flex flex-col items-center">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="w-full bg-white/70 backdrop-blur-xl border border-white/50 rounded-3xl shadow-xl p-12 text-center"
+                    >
+                        <div className="text-8xl mb-6">🤖</div>
+                        <h2 className="text-3xl font-bold text-slate-800 mb-4">功能开发中</h2>
+                        <p className="text-slate-500 mb-8">机器人集成功能即将上线，敬请期待！</p>
+                        <button
+                            onClick={() => setCurrentView("home")}
+                            className="px-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-500 transition-all"
+                        >
+                            返回主页
+                        </button>
+                    </motion.div>
+                </div>
             )}
         </SharedLayout>
     );
