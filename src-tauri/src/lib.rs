@@ -1,10 +1,12 @@
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 use serde::{Deserialize, Serialize};
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+static AUTH_COMPLETED: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
+static AUTH_RUNNING: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
 
 #[link(name = "weauth", kind = "raw-dylib")]
 extern "C" {
@@ -39,9 +41,17 @@ pub struct TokenData {
 }
 
 extern "C" fn auth_callback(event_type: c_int, msg: *const c_char) {
+    // 如果已经完成认证，忽略后续事件
+    if let Some(completed) = AUTH_COMPLETED.get() {
+        if *completed.lock().unwrap() {
+            return;
+        }
+    }
+
     let message = unsafe {
         if msg.is_null() { String::new() } else { CStr::from_ptr(msg).to_string_lossy().into_owned() }
     };
+
     if let Some(app) = APP_HANDLE.get() {
         let _ = app.emit("weauth-event", AuthEventPayload { event_type, message });
     }
@@ -49,10 +59,39 @@ extern "C" fn auth_callback(event_type: c_int, msg: *const c_char) {
 
 #[tauri::command]
 fn start_weauth_flow() -> Result<(), String> {
-    unsafe {
-        let res = StartAuthFlow();
-        if res != 0 { return Err("引擎启动失败".into()); }
+    // 检查是否已经在运行
+    if let Some(running) = AUTH_RUNNING.get() {
+        let mut is_running = running.lock().unwrap();
+        if *is_running {
+            return Ok(()); // 已经在运行，直接返回
+        }
+        *is_running = true;
     }
+
+    // 重置完成状态
+    if let Some(completed) = AUTH_COMPLETED.get() {
+        *completed.lock().unwrap() = false;
+    }
+
+    // 在单独的线程中启动，避免DLL崩溃影响主进程
+    std::thread::spawn(|| {
+        unsafe {
+            let res = StartAuthFlow();
+            if res != 0 {
+                if let Some(app) = APP_HANDLE.get() {
+                    let _ = app.emit("weauth-event", AuthEventPayload {
+                        event_type: -1,
+                        message: "引擎启动失败".into()
+                    });
+                }
+            }
+        }
+        // 执行完成后重置运行状态
+        if let Some(running) = AUTH_RUNNING.get() {
+            *running.lock().unwrap() = false;
+        }
+    });
+
     Ok(())
 }
 
@@ -79,6 +118,11 @@ async fn exchange_token(code: String) -> Result<TokenData, String> {
         }
     }
 
+    // 标记认证完成，停止接收DLL事件
+    if let Some(completed) = AUTH_COMPLETED.get() {
+        *completed.lock().unwrap() = true;
+    }
+
     Ok(TokenData {
         access_token: data.access_token.unwrap_or_default(),
         refresh_token: data.refresh_token.unwrap_or_default(),
@@ -93,10 +137,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             APP_HANDLE.set(app.handle().clone()).unwrap();
+            AUTH_COMPLETED.set(Arc::new(Mutex::new(false))).unwrap();
+            AUTH_RUNNING.set(Arc::new(Mutex::new(false))).unwrap();
             unsafe { RegisterCallback(auth_callback); }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_weauth_flow, exchange_token]) // 别忘了注册新命令
+        .invoke_handler(tauri::generate_handler![start_weauth_flow, exchange_token])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

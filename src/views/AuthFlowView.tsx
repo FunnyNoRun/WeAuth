@@ -20,14 +20,14 @@ const CopyableInput = ({ label, value, placeholder }: { label: string; value: st
     };
 
     return (
-        <div className="flex flex-col mb-3">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 pl-1">{label}</span>
+        <div className="flex flex-col mb-4">
+            <span className="text-sm font-bold text-slate-600 tracking-wide mb-2 pl-1">{label}</span>
             <div className="relative">
                 <input
                     readOnly
                     value={value}
                     placeholder={placeholder}
-                    className={`w-full bg-slate-50 border ${value ? 'border-emerald-200 text-slate-700' : 'border-slate-100 text-slate-400'} font-mono text-xs rounded-xl px-3 py-2.5 pr-10 focus:outline-none transition-colors`}
+                    className={`w-full bg-slate-50 border ${value ? 'border-emerald-200 text-slate-700' : 'border-slate-100 text-slate-400'} font-mono text-base rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors`}
                 />
                 <button
                     onClick={handleCopy}
@@ -45,6 +45,7 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
     const [status, setStatus] = useState("正在初始化引擎...");
     const [qrBase64, setQrBase64] = useState("");
     const [nickname, setNickname] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState("");
 
     const [authCode, setAuthCode] = useState("");
     const [tokens, setTokens] = useState<TokenData | null>(null);
@@ -52,16 +53,12 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
 
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [showLogs, setShowLogs] = useState(false);
-    const logsEndRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (showLogs) logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [logs, showLogs]);
 
     const startFlow = () => {
         setStatus("正在初始化引擎...");
         setQrBase64("");
         setNickname("");
+        setAvatarUrl("");
         setAuthCode("");
         setTokens(null);
         setIsCompleted(false);
@@ -93,15 +90,44 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
         const unlisten = listen<{ event_type: number; message: string }>("weauth-event", (event) => {
             const { event_type, message } = event.payload;
             const now = new Date().toLocaleTimeString();
-            setLogs(prev => [...prev, { time: now, type: event_type, msg: message }]);
+
+            // 日志去重：一秒内只保留一条，优先保留非"等待扫码..."的日志
+            setLogs(prev => {
+                const lastLog = prev[prev.length - 1];
+                if (lastLog) {
+                    const lastTime = new Date(`1970-01-01 ${lastLog.time}`);
+                    const currentTime = new Date(`1970-01-01 ${now}`);
+                    const timeDiff = Math.abs(currentTime.getTime() - lastTime.getTime());
+
+                    // 如果距离上一条日志不到1秒
+                    if (timeDiff < 1000) {
+                        // 如果新日志是"等待扫码..."，忽略它
+                        if (message.includes("等待扫码")) {
+                            return prev;
+                        }
+                        // 如果上一条是"等待扫码..."，新日志不是，则替换
+                        if (lastLog.msg.includes("等待扫码") && !message.includes("等待扫码")) {
+                            return [...prev.slice(0, -1), { time: now, type: event_type, msg: message }];
+                        }
+                    }
+                }
+                return [...prev, { time: now, type: event_type, msg: message }];
+            });
 
             switch (event_type) {
                 case 0: setStatus(message); break;
                 case 1: setQrBase64(message); setStatus("请使用微信扫描二维码"); break;
                 case 2:
-                    setStatus(message);
-                    const match = message.match(/\(用户:\s*(.*?)\)/);
-                    if (match && match[1]) setNickname(match[1]);
+                    // 解析昵称和头像：格式 "已扫码，等待确认... (用户: xxx)|头像: xxx"
+                    const userMatch = message.match(/\(用户:\s*(.*?)\)/);
+                    const avatarMatch = message.match(/\|头像:\s*(.+)/);
+                    if (userMatch && userMatch[1]) {
+                        setNickname(userMatch[1]);
+                        setStatus(`已扫码，等待确认... (用户: ${userMatch[1]})`);
+                    }
+                    if (avatarMatch && avatarMatch[1] && avatarMatch[1] !== "无头像") {
+                        setAvatarUrl(avatarMatch[1]);
+                    }
                     break;
                 case 3: setStatus("获取底层鉴权令牌成功"); break;
                 case 4:
@@ -165,8 +191,14 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
 
                     {/* 用户身份展示 */}
                     <div className="w-full flex items-center space-x-4 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shadow-inner shrink-0">
-                            {nickname ? <User className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
+                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shadow-inner shrink-0 overflow-hidden">
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt="用户头像" className="w-full h-full object-cover" />
+                            ) : nickname ? (
+                                <User className="w-6 h-6" />
+                            ) : (
+                                <MessageCircle className="w-6 h-6" />
+                            )}
                         </div>
                         <div className="min-w-0 overflow-hidden">
                             <p className="text-slate-800 font-bold text-base truncate">{nickname || "等待扫码接入..."}</p>
@@ -182,18 +214,18 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
                         <h3 className="font-bold text-slate-700">Authentication Credentials</h3>
                     </div>
 
-                    <div className="space-y-1">
-                        <CopyableInput label="Oauth Auth Code" value={authCode} placeholder="等待扫码下发..." />
+                    <div className="space-y-2">
+                        <CopyableInput label="Auth Code" value={authCode} placeholder="等待扫码下发..." />
                         <CopyableInput label="Access Token" value={tokens?.access_token || ""} placeholder="等待换取..." />
                         <CopyableInput label="Refresh Token" value={tokens?.refresh_token || ""} placeholder="等待换取..." />
 
                         {/* OpenID 和 UnionID 并排显示节省空间 */}
                         <div className="flex space-x-3">
                             <div className="flex-1">
-                                <CopyableInput label="Open ID" value={tokens?.openid || ""} placeholder="等待换取..." />
+                                <CopyableInput label="openid" value={tokens?.openid || ""} placeholder="等待换取..." />
                             </div>
                             <div className="flex-1">
-                                <CopyableInput label="Union ID" value={tokens?.unionid || ""} placeholder="等待换取..." />
+                                <CopyableInput label="unionid" value={tokens?.unionid || ""} placeholder="等待换取..." />
                             </div>
                         </div>
                     </div>
@@ -238,7 +270,6 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
                                     )}
                                 </div>
                             ))}
-                            <div ref={logsEndRef} />
                         </div>
                     </motion.div>
                 )}
