@@ -9,6 +9,10 @@ jobs:
   release:
     runs-on: windows-latest
 
+    # 显式开启写入权限，允许 Action 创建 Release 并上传二进制附件
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -31,10 +35,17 @@ jobs:
       - name: Build Tauri app
         run: pnpm tauri build
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      # 自动发布到 GitHub Release 并挂载打包产物
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: weauth-windows
-          path: |
+          # 自动抓取当前触发的 Tag（例如 v0.0.2）作为 Release 名称
+          name: Release ${{ github.ref_name }}
+          # 自动抓取并包含这几个打包好的安装包文件
+          files: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
+          # 如果想自动把最近的 commit 记录作为 Release 日志，可以开启这个（可选）：
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
