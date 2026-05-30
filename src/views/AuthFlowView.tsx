@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { listen } from "@tauri-apps/api/event";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, Check, Terminal, ShieldCheck, User, Key, ArrowLeft, RefreshCw, QrCode, Fingerprint } from "lucide-react";
 import { EmeraldSpinner } from "../components/EmeraldSpinner";
@@ -51,7 +51,6 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
 
     const [authCode, setAuthCode] = useState("");
     const [tokens, setTokens] = useState<TokenData | null>(null);
-    // const [isCompleted, setIsCompleted] = useState(false);
 
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [showLogs, setShowLogs] = useState(false);
@@ -65,7 +64,6 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
         setAvatarUrl("");
         setAuthCode("");
         setTokens(null);
-        // setIsCompleted(false);
         invoke("start_weauth_flow").catch(console.error);
     };
 
@@ -78,7 +76,6 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
             .then((data) => {
                 setTokens(data);
                 setStatus("Verification Success");
-                // setIsCompleted(true);
             })
             .catch((err) => {
                 setStatus("Exchange Failed");
@@ -87,6 +84,23 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
     }, [authCode]);
 
     useEffect(() => {
+        // 监听来自深链接的事件
+        const unlistenDeepLink = listen<string[]>("weauth-deep-link", (event) => {
+            const urls = event.payload;
+            if (urls && urls.length > 0) {
+                const urlStr = urls[0];
+                try {
+                    const url = new URL(urlStr);
+                    const uuid = url.searchParams.get("uuid");
+                    if (uuid) {
+                        setStatus(`Deep Link Detected: ${uuid}`);
+                    }
+                } catch (e) {
+                    console.error("Deep link parse error:", e);
+                }
+            }
+        });
+
         const unlisten = listen<{ event_type: number; message: string }>("weauth-event", (event) => {
             const { event_type, message } = event.payload;
             const now = new Date().toLocaleTimeString();
@@ -133,8 +147,8 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
         }
 
         return () => { 
-            unlisten.then(f => f()); 
-            unlistenDeepLink.then(f => f());
+            unlisten.then((f: UnlistenFn) => f()); 
+            unlistenDeepLink.then((f: UnlistenFn) => f());
         };
     }, []);
 
