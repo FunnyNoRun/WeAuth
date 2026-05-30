@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X, Sun, Moon, Check, Activity } from "lucide-react";
 import { FaGithub, FaQq } from "react-icons/fa";
 import { SharedLayout } from "./components/SharedLayout";
-import { useTheme } from "./hooks/useTheme";
+import { useTheme } from "./context/ThemeContext";
 
 const TypewriterText = ({ text }: { text: string }) => {
     const [displayedText, setDisplayedText] = useState("");
@@ -55,7 +55,7 @@ const ThemeToggle = () => {
     return (
         <button
             onClick={toggleTheme}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             aria-label="Toggle theme"
         >
             {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
@@ -111,8 +111,13 @@ export default function App() {
     const proxies = useMemo(() => [
         { name: "Direct", url: "" },
         { name: "GH-Proxy", url: "https://gh-proxy.com/" },
-        { name: "Mirror", url: "https://mirror.ghproxy.com/" },
-        { name: "999888", url: "https://gh.api.99988866.xyz/" }
+        { name: "DPik", url: "https://github.dpik.top/" },
+        { name: "Memory", url: "https://github-proxy.memory-echoes.cn/" },
+        { name: "Felicity", url: "https://gh.felicity.ac.cn/" },
+        { name: "927223", url: "https://gh.927223.xyz/" },
+        { name: "Bugdey", url: "https://gh.bugdey.us.kg/" },
+        { name: "Akaere", url: "https://cdn.akaere.online/" },
+        { name: "YYLX", url: "https://git.yylx.win/" }
     ], []);
 
     const [selectedProxy, setSelectedProxy] = useState(proxies[1]);
@@ -125,12 +130,18 @@ export default function App() {
         
         await Promise.all(proxies.map(async (proxy) => {
             if (proxy.url === "") {
-                results[proxy.name] = 0; // Skip direct for now or give it a base value
+                const start = Date.now();
+                try {
+                    await fetch("https://github.com", { mode: 'no-cors', cache: 'no-cache' });
+                    results[proxy.name] = Date.now() - start;
+                } catch (e) {
+                    results[proxy.name] = "error";
+                }
                 return;
             }
             const start = Date.now();
             try {
-                // Use a small file or just the root to test latency
+                // Test latency by fetching the proxy root or a known small asset
                 await fetch(proxy.url, { mode: 'no-cors', cache: 'no-cache' });
                 results[proxy.name] = Date.now() - start;
             } catch (e) {
@@ -140,13 +151,15 @@ export default function App() {
 
         setLatencies(results);
         
-        // Auto-select fastest
-        const validProxies = proxies.filter(p => typeof results[p.name] === 'number');
+        // Auto-select fastest excluding Direct if it's too slow or error
+        const validProxies = proxies.filter(p => typeof results[p.name] === 'number' && results[p.name] !== 0);
         if (validProxies.length > 0) {
             const fastest = validProxies.reduce((prev, curr) => 
                 (results[prev.name] as number) < (results[curr.name] as number) ? prev : curr
             );
             setSelectedProxy(fastest);
+        } else if (typeof results["Direct"] === 'number') {
+            setSelectedProxy(proxies[0]);
         }
         setIsTesting(false);
     };
@@ -301,26 +314,26 @@ export default function App() {
                                 </div>
 
                                 {/* Proxy Selector */}
-                                <div className="w-full max-w-md p-4 rounded-2xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-200 dark:border-slate-800">
-                                    <div className="flex items-center justify-between mb-3">
+                                <div className="w-full max-w-2xl p-4 rounded-2xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-200 dark:border-slate-800">
+                                    <div className="flex items-center justify-between mb-3 px-1">
                                         <div className="flex items-center space-x-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
                                             <Activity className="w-3 h-3" />
-                                            <span>下载线路优化</span>
+                                            <span>下载线路优化 (选择最快线路)</span>
                                         </div>
                                         <button 
                                             onClick={testLatency}
                                             disabled={isTesting}
-                                            className="text-[10px] px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                            className="text-[10px] px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors disabled:opacity-50 cursor-pointer font-bold"
                                         >
                                             {isTesting ? "检测中..." : "重新测速"}
                                         </button>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                         {proxies.map((proxy) => (
                                             <button
                                                 key={proxy.name}
                                                 onClick={() => setSelectedProxy(proxy)}
-                                                className={`relative flex flex-col p-2 rounded-xl border transition-all ${
+                                                className={`relative flex flex-col p-2 rounded-xl border transition-all cursor-pointer ${
                                                     selectedProxy.name === proxy.name 
                                                     ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500/50 text-emerald-700 dark:text-emerald-400 shadow-sm" 
                                                     : "bg-white/50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
@@ -330,9 +343,9 @@ export default function App() {
                                                     <span className="text-xs font-bold">{proxy.name}</span>
                                                     {selectedProxy.name === proxy.name && <Check className="w-3 h-3" />}
                                                 </div>
-                                                <div className="text-[10px] mt-1 opacity-60">
-                                                    {latencies[proxy.name] === "error" ? "超时" : 
-                                                     latencies[proxy.name] !== undefined ? `${latencies[proxy.name]}ms` : "--"}
+                                                <div className="text-[10px] mt-1 opacity-60 flex items-center justify-between">
+                                                    <span>{latencies[proxy.name] === "error" ? "超时" : 
+                                                     latencies[proxy.name] !== undefined ? `${latencies[proxy.name]}ms` : "--"}</span>
                                                 </div>
                                             </button>
                                         ))}
