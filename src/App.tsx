@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle } from "lucide-react";
+import { ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X } from "lucide-react";
 import { FaGithub } from "react-icons/fa";
 import { SharedLayout } from "./components/SharedLayout";
 
@@ -124,23 +124,25 @@ export default function App() {
                 <AnimatePresence>
                     {showInstallPrompt && (
                         <motion.div 
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            className="w-full max-w-2xl mb-8 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start space-x-4 shadow-sm"
+                            initial={{ opacity: 0, y: -20, x: "-50%" }}
+                            animate={{ opacity: 1, y: 0, x: "-50%" }}
+                            exit={{ opacity: 0, y: -20, x: "-50%" }}
+                            className="fixed top-24 left-1/2 z-[100] w-[calc(100%-3rem)] max-w-2xl p-4 bg-white/90 backdrop-blur-xl border border-amber-200 rounded-2xl flex items-start space-x-4 shadow-2xl"
                         >
-                            <AlertCircle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
-                            <div>
-                                <h3 className="font-bold text-amber-900">无法打开 WeAuth 客户端</h3>
-                                <p className="text-sm text-amber-800">
+                            <div className="bg-amber-100 p-2 rounded-xl">
+                                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-slate-900">无法打开 WeAuth 客户端</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed mt-1">
                                     如果您已经安装了 WeAuth，请在浏览器弹窗中选择“允许”。如果尚未安装，请点击下方按钮前往下载最新版本。
                                 </p>
                             </div>
                             <button 
                                 onClick={() => setShowInstallPrompt(false)}
-                                className="text-amber-500 hover:text-amber-700 font-bold text-lg px-2"
+                                className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-900"
                             >
-                                脳
+                                <X className="w-5 h-5" />
                             </button>
                         </motion.div>
                     )}
