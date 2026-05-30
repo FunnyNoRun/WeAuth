@@ -4,3 +4,4 @@ target/
 .vs/
 .claude/
 node_modules/
+dist/
