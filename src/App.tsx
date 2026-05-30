@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code2, Bot, ExternalLink, Zap, Shield, Cpu, ChevronRight } from "lucide-react";
-import { FaGithub } from "react-icons/fa";
+import { Code2, Bot, ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X } from "lucide-react";
+import { FaGithub, FaQq } from "react-icons/fa";
 import { SharedLayout } from "./components/SharedLayout";
 import AuthFlowView from "./views/AuthFlowView";
 
@@ -53,7 +53,7 @@ const Navbar = ({ onHome }: { onHome: () => void }) => (
     <motion.nav 
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex items-center justify-between"
+        className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex items-center justify-between backdrop-blur-md bg-white/30 border-b border-white/20"
     >
         <div 
             onClick={onHome}
@@ -69,7 +69,7 @@ const Navbar = ({ onHome }: { onHome: () => void }) => (
             </span>
         </div>
 
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-4 md:space-x-6">
             <a 
                 href="https://github.com/FunnyNoRun/WeAuth" 
                 target="_blank" 
@@ -77,24 +77,109 @@ const Navbar = ({ onHome }: { onHome: () => void }) => (
                 className="flex items-center space-x-2 text-slate-500 hover:text-slate-800 transition-colors font-medium text-sm"
             >
                 <FaGithub className="w-5 h-5" />
-                <span>GitHub</span>
+                <span className="hidden sm:inline">GitHub</span>
             </a>
             <div className="h-4 w-[1px] bg-slate-200" />
-            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">
-                v0.1.0-alpha
-            </span>
+            <a 
+                href="tencent://groupwpa/?subcmd=all&param=7B2267726F757055696E223A2231303930333936303730222C2274696D655374616D70223A313738303130363535303734322C22617574684B6579223A223754665656686F5A6263454D446274564559716873337958385A4F374C337A68486A345944436C76636C574A2B744D324F5069626C412B5655774B6D5A4C6371222C2261757468223A22227D"
+                className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100 transition-colors"
+            >
+                <FaQq className="w-4 h-4" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">QQ 交流</span>
+            </a>
         </div>
     </motion.nav>
 );
 
 export default function App() {
     const [currentView, setCurrentView] = useState<"home" | "developer" | "bot">("home");
+    const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        // Device detection
+        const checkMobile = () => {
+            const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+            return /android|iphone|ipad|ipod/i.test(userAgent.toLowerCase());
+        };
+        
+        const mobile = checkMobile();
+        setIsMobile(mobile);
+
+        // Deep Link logic
+        const params = new URLSearchParams(window.location.search);
+        const uuid = params.get("uuid");
+
+        if (uuid && !mobile) {
+            const deepLink = `weauth://wechat-oauth?uuid=${uuid}`;
+            let hasBlurred = false;
+
+            const handleBlur = () => {
+                hasBlurred = true;
+            };
+
+            window.addEventListener('blur', handleBlur);
+
+            // Attempt to redirect
+            window.location.href = deepLink;
+
+            // Timeout to show prompt if app didn't open
+            const timer = setTimeout(() => {
+                if (!hasBlurred) {
+                    setShowInstallPrompt(true);
+                }
+                window.removeEventListener('blur', handleBlur);
+            }, 2500);
+
+            return () => {
+                clearTimeout(timer);
+                window.removeEventListener('blur', handleBlur);
+            };
+        }
+    }, []);
+
+    // Auto-hide prompt after 10 seconds
+    useEffect(() => {
+        if (showInstallPrompt) {
+            const timer = setTimeout(() => {
+                setShowInstallPrompt(false);
+            }, 10000);
+            return () => clearTimeout(timer);
+        }
+    }, [showInstallPrompt]);
 
     return (
         <SharedLayout>
             <Navbar onHome={() => setCurrentView("home")} />
 
             <main className="w-full max-w-7xl px-8 pt-24 pb-12 flex flex-col items-center justify-center">
+                <AnimatePresence>
+                    {showInstallPrompt && (
+                        <motion.div 
+                            initial={{ opacity: 0, y: -20, x: "-50%" }}
+                            animate={{ opacity: 1, y: 0, x: "-50%" }}
+                            exit={{ opacity: 0, y: -20, x: "-50%" }}
+                            className="fixed top-24 left-1/2 z-[100] w-[calc(100%-3rem)] max-w-2xl p-4 bg-white/90 backdrop-blur-xl border border-amber-200 rounded-2xl flex items-start space-x-4 shadow-2xl"
+                        >
+                            <div className="bg-amber-100 p-2 rounded-xl">
+                                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-slate-900">无法打开 WeAuth 客户端</h3>
+                                <p className="text-sm text-slate-500 leading-relaxed mt-1">
+                                    如果您已经安装了 WeAuth，请在浏览器弹窗中选择“允许”。如果尚未安装，请点击下方按钮前往下载最新版本。
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setShowInstallPrompt(false)}
+                                className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-900"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 <AnimatePresence mode="wait">
                     {currentView === "home" && (
                         <motion.div 
@@ -148,7 +233,7 @@ export default function App() {
                                     >
                                         <button
                                             onClick={() => setCurrentView("developer")}
-                                            className="group relative px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 hover:-translate-y-1 transition-all flex items-center space-x-3 overflow-hidden"
+                                            className="group relative px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 hover:-translate-y-1 transition-all flex items-center justify-center space-x-3 overflow-hidden"
                                         >
                                             <Code2 className="w-5 h-5" />
                                             <span>我是开发者</span>
