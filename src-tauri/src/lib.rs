@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int};
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Listener};
 use serde::{Deserialize, Serialize};
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
@@ -135,11 +135,23 @@ async fn exchange_token(code: String) -> Result<TokenData, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             APP_HANDLE.set(app.handle().clone()).unwrap();
             AUTH_COMPLETED.set(Arc::new(Mutex::new(false))).unwrap();
             AUTH_RUNNING.set(Arc::new(Mutex::new(false))).unwrap();
             unsafe { RegisterCallback(auth_callback); }
+
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                app.deep_link().register_all().unwrap();
+            }
+
+            app.listen("deep-link://", |event| {
+                println!("[Deep Link] 收到深链接: {:?}", event.payload());
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![start_weauth_flow, exchange_token])

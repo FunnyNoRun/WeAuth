@@ -1,15 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { MessageCircle, Copy, Check, Terminal, ShieldCheck, User, Key } from "lucide-react";
+import { MessageCircle, Copy, Check, Terminal, ShieldCheck, User, Key, ArrowLeft, RefreshCw, QrCode, Fingerprint } from "lucide-react";
 import { EmeraldSpinner } from "../components/EmeraldSpinner";
 
 interface LogEntry { time: string; type: number; msg: string; }
 interface TokenData { access_token: string; refresh_token: string; openid: string; unionid: string; }
 
-// --- 优雅的复用组件：可复制输入框 ---
-const CopyableInput = ({ label, value, placeholder }: { label: string; value: string; placeholder: string }) => {
+const CopyableInput = ({ label, value, placeholder, icon: Icon }: { label: string; value: string; placeholder: string, icon: any }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
@@ -20,19 +19,22 @@ const CopyableInput = ({ label, value, placeholder }: { label: string; value: st
     };
 
     return (
-        <div className="flex flex-col mb-4">
-            <span className="text-sm font-bold text-slate-600 tracking-wide mb-2 pl-1">{label}</span>
-            <div className="relative">
+        <div className="flex flex-col mb-5">
+            <div className="flex items-center space-x-2 mb-2 pl-1">
+                <Icon className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{label}</span>
+            </div>
+            <div className="group relative">
                 <input
                     readOnly
                     value={value}
                     placeholder={placeholder}
-                    className={`w-full bg-slate-50 border ${value ? 'border-emerald-200 text-slate-700' : 'border-slate-100 text-slate-400'} font-mono text-base rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors`}
+                    className={`w-full bg-white border ${value ? 'border-emerald-100 text-slate-700 shadow-sm' : 'border-slate-100 text-slate-400'} font-mono text-sm rounded-xl px-4 py-3.5 pr-12 focus:outline-none transition-all duration-300 group-hover:border-emerald-200`}
                 />
                 <button
                     onClick={handleCopy}
                     disabled={!value}
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${value ? 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 cursor-pointer' : 'text-slate-200 cursor-not-allowed'}`}
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${value ? 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 cursor-pointer' : 'text-slate-200 cursor-not-allowed'}`}
                 >
                     {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                 </button>
@@ -42,7 +44,7 @@ const CopyableInput = ({ label, value, placeholder }: { label: string; value: st
 };
 
 export default function AuthFlowView({ onBack }: { onBack: () => void }) {
-    const [status, setStatus] = useState("正在初始化引擎...");
+    const [status, setStatus] = useState("Initializing Engine...");
     const [qrBase64, setQrBase64] = useState("");
     const [nickname, setNickname] = useState("");
     const [avatarUrl, setAvatarUrl] = useState("");
@@ -53,9 +55,11 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
 
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [showLogs, setShowLogs] = useState(false);
+    const [scannedUser, setScannedUser] = useState("");
+    const hasInitialized = useRef(false);
 
     const startFlow = () => {
-        setStatus("正在初始化引擎...");
+        setStatus("Initializing...");
         setQrBase64("");
         setNickname("");
         setAvatarUrl("");
@@ -65,23 +69,19 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
         invoke("start_weauth_flow").catch(console.error);
     };
 
-    const handleReset = () => {
-        startFlow();
-    };
+    const handleReset = () => startFlow();
 
-    // 核心：当获取到 authCode 时，自动向 Rust 请求 Token
     useEffect(() => {
         if (!authCode) return;
-
-        setStatus("正在换取微信 Access Token...");
+        setStatus("Exchanging tokens...");
         invoke<TokenData>("exchange_token", { code: authCode })
             .then((data) => {
                 setTokens(data);
-                setStatus("全流程验证通过，数据已就绪！");
+                setStatus("Verification Success");
                 setIsCompleted(true);
             })
             .catch((err) => {
-                setStatus("Token换取失败");
+                setStatus("Exchange Failed");
                 console.error(err);
             });
     }, [authCode]);
@@ -91,24 +91,12 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
             const { event_type, message } = event.payload;
             const now = new Date().toLocaleTimeString();
 
-            // 日志去重：一秒内只保留一条，优先保留非"等待扫码..."的日志
             setLogs(prev => {
                 const lastLog = prev[prev.length - 1];
-                if (lastLog) {
-                    const lastTime = new Date(`1970-01-01 ${lastLog.time}`);
-                    const currentTime = new Date(`1970-01-01 ${now}`);
-                    const timeDiff = Math.abs(currentTime.getTime() - lastTime.getTime());
-
-                    // 如果距离上一条日志不到1秒
-                    if (timeDiff < 1000) {
-                        // 如果新日志是"等待扫码..."，忽略它
-                        if (message.includes("等待扫码")) {
-                            return prev;
-                        }
-                        // 如果上一条是"等待扫码..."，新日志不是，则替换
-                        if (lastLog.msg.includes("等待扫码") && !message.includes("等待扫码")) {
-                            return [...prev.slice(0, -1), { time: now, type: event_type, msg: message }];
-                        }
+                if (lastLog && Math.abs(new Date(`1970-01-01 ${now}`).getTime() - new Date(`1970-01-01 ${lastLog.time}`).getTime()) < 1000) {
+                    if (message.includes("等待扫码") || message.includes("等待确认")) return prev;
+                    if ((lastLog.msg.includes("等待扫码") || lastLog.msg.includes("等待确认")) && !(message.includes("等待扫码") || message.includes("等待确认"))) {
+                        return [...prev.slice(0, -1), { time: now, type: event_type, msg: message }];
                     }
                 }
                 return [...prev, { time: now, type: event_type, msg: message }];
@@ -116,158 +104,215 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
 
             switch (event_type) {
                 case 0: setStatus(message); break;
-                case 1: setQrBase64(message); setStatus("请使用微信扫描二维码"); break;
+                case 1: setQrBase64(message); setStatus("Please Scan QR Code"); break;
                 case 2:
-                    // 解析昵称和头像：格式 "已扫码，等待确认... (用户: xxx)|头像: xxx"
                     const userMatch = message.match(/\(用户:\s*(.*?)\)/);
                     const avatarMatch = message.match(/\|头像:\s*(.+)/);
                     if (userMatch && userMatch[1]) {
-                        setNickname(userMatch[1]);
-                        setStatus(`已扫码，等待确认... (用户: ${userMatch[1]})`);
+                        const currentUser = userMatch[1];
+                        if (scannedUser !== currentUser) {
+                            setScannedUser(currentUser);
+                            setNickname(currentUser);
+                            setStatus(`User: ${currentUser} (Awaiting Confirmation)`);
+                        }
                     }
-                    if (avatarMatch && avatarMatch[1] && avatarMatch[1] !== "无头像") {
-                        setAvatarUrl(avatarMatch[1]);
-                    }
+                    if (avatarMatch && avatarMatch[1] && avatarMatch[1] !== "无头像") setAvatarUrl(avatarMatch[1]);
                     break;
-                case 3: setStatus("获取底层鉴权令牌成功"); break;
-                case 4:
-                    const code = message.replace("授权码:", "").trim();
-                    setAuthCode(code);
-                    break;
+                case 3: setStatus("Auth Token Acquired"); break;
+                case 4: setAuthCode(message.replace("授权码:", "").trim()); break;
                 case -1:
-                    setStatus(`错误: ${message}，正在重试...`);
-                    setTimeout(() => {
-                        invoke("start_weauth_flow").catch(console.error);
-                    }, 2000);
+                    setStatus(`Error: ${message}`);
+                    setTimeout(() => invoke("start_weauth_flow").catch(console.error), 2000);
                     break;
             }
         });
 
-        startFlow();
+        if (!hasInitialized.current) {
+            hasInitialized.current = true;
+            startFlow();
+        }
+
         return () => { unlisten.then(f => f()); };
     }, []);
 
     return (
-        <div className="w-full max-w-5xl px-4 flex flex-col items-center">
-            {/* 顶栏控制 */}
-            <div className="w-full flex justify-between items-center mb-6">
-                <button onClick={onBack} className="text-slate-500 hover:text-emerald-600 transition-colors">← 返回主页</button>
-                <div className="flex items-center space-x-3">
-                    {isCompleted && (
-                        <button
-                            onClick={handleReset}
-                            className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-full shadow-sm hover:bg-emerald-500 transition-all"
-                        >
-                            <span>重新开始</span>
-                        </button>
-                    )}
-                    <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100">
-                        <ShieldCheck className="w-5 h-5 text-emerald-500" />
-                        <span className="font-semibold text-slate-700">Developer Mode</span>
+        <div className="w-full max-w-6xl px-4 flex flex-col items-center">
+            {/* Action Bar */}
+            <div className="w-full flex justify-between items-center mb-8">
+                <button 
+                    onClick={onBack} 
+                    className="flex items-center space-x-2 text-slate-400 hover:text-emerald-600 transition-all font-bold text-sm uppercase tracking-widest group"
+                >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    <span>Back to Home</span>
+                </button>
+                
+                <div className="flex items-center space-x-4">
+                    <button
+                        onClick={handleReset}
+                        className="flex items-center space-x-2 bg-white text-slate-600 px-5 py-2.5 rounded-xl shadow-sm border border-slate-200 hover:border-emerald-300 hover:text-emerald-600 transition-all text-sm font-bold"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Reset Session</span>
+                    </button>
+                    <div className="flex items-center space-x-3 bg-slate-900 text-white px-5 py-2.5 rounded-xl shadow-xl border border-slate-800">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-black uppercase tracking-widest">Secure Console</span>
                     </div>
                 </div>
             </div>
 
-            {/* 核心玻璃态卡片 */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full bg-white/70 backdrop-blur-xl border border-white/50 rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row">
-
-                {/* 左半部分：状态与扫码区 */}
-                <div className="w-full md:w-[45%] p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-200/60 bg-gradient-to-b from-white to-slate-50/50">
-                    <h2 className="text-xl font-bold text-slate-800 mb-2">连接验证</h2>
-                    <p className="text-emerald-600 font-medium mb-8 h-6 text-center">{status}</p>
-
-                    <div className="relative w-64 h-64 bg-slate-100/50 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center p-2 mb-6">
-                        <AnimatePresence mode="wait">
-                            {!qrBase64 ? (
-                                <motion.div key="spinner" exit={{ opacity: 0 }} className="flex flex-col items-center">
-                                    <EmeraldSpinner />
-                                    <span className="mt-4 text-sm text-slate-400">正在生成验证码...</span>
-                                </motion.div>
-                            ) : (
-                                <motion.img key="qr" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} src={`data:image/png;base64,${qrBase64}`} className="w-full h-full object-contain rounded-xl shadow-sm" alt="Wechat QR" />
-                            )}
-                        </AnimatePresence>
+            {/* Main Content Card */}
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.98 }} 
+                animate={{ opacity: 1, scale: 1 }} 
+                className="w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden flex flex-col lg:flex-row min-h-[600px]"
+            >
+                {/* Left: Identity & Scan */}
+                <div className="w-full lg:w-[40%] p-12 flex flex-col items-center border-b lg:border-b-0 lg:border-r border-slate-50 bg-slate-50/30">
+                    <div className="text-center mb-10">
+                        <h2 className="text-2xl font-black text-slate-800 mb-2">WeChat Verification</h2>
+                        <div className="flex items-center justify-center space-x-2">
+                            <motion.div 
+                                animate={{ opacity: [0.4, 1, 0.4] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                className="w-2 h-2 rounded-full bg-emerald-500" 
+                            />
+                            <span className="text-emerald-600 font-bold text-sm uppercase tracking-wider italic">{status}</span>
+                        </div>
                     </div>
 
-                    {/* 用户身份展示 */}
-                    <div className="w-full flex items-center space-x-4 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shadow-inner shrink-0 overflow-hidden">
-                            {avatarUrl ? (
-                                <img src={avatarUrl} alt="用户头像" className="w-full h-full object-cover" />
-                            ) : nickname ? (
-                                <User className="w-6 h-6" />
-                            ) : (
-                                <MessageCircle className="w-6 h-6" />
-                            )}
+                    <div className="relative group">
+                        {/* QR Scanner Decoration */}
+                        <div className="absolute -inset-4 border border-emerald-500/10 rounded-[2rem] pointer-events-none group-hover:border-emerald-500/20 transition-colors" />
+                        <div className="absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 border-emerald-500 rounded-tl-xl" />
+                        <div className="absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 border-emerald-500 rounded-tr-xl" />
+                        <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 border-emerald-500 rounded-bl-xl" />
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 border-emerald-500 rounded-br-xl" />
+
+                        <div className="relative w-64 h-64 bg-white rounded-2xl shadow-inner flex items-center justify-center p-3 overflow-hidden">
+                            <AnimatePresence mode="wait">
+                                {!qrBase64 ? (
+                                    <motion.div key="spinner" exit={{ opacity: 0 }} className="flex flex-col items-center">
+                                        <EmeraldSpinner />
+                                        <QrCode className="w-8 h-8 text-slate-200 mt-4 animate-pulse" />
+                                    </motion.div>
+                                ) : (
+                                    <motion.div key="qr" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative w-full h-full">
+                                        <img src={`data:image/png;base64,${qrBase64}`} className="w-full h-full object-contain rounded-lg" alt="QR" />
+                                        {/* Scan Line Animation */}
+                                        <motion.div 
+                                            animate={{ top: ["0%", "100%", "0%"] }}
+                                            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                                            className="absolute left-0 right-0 h-0.5 bg-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.5)] z-10"
+                                        />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
-                        <div className="min-w-0 overflow-hidden">
-                            <p className="text-slate-800 font-bold text-base truncate">{nickname || "等待扫码接入..."}</p>
-                            <p className="text-slate-400 text-xs">WeChat Identity Session</p>
+                    </div>
+
+                    <div className="mt-12 w-full max-w-xs">
+                        <div className="relative p-5 bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-4 overflow-hidden">
+                            <div className="absolute top-0 right-0 p-2">
+                                <Fingerprint className="w-10 h-10 text-slate-50 opacity-10" />
+                            </div>
+                            <div className="w-14 h-14 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 overflow-hidden shrink-0">
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt="User" className="w-full h-full object-cover scale-110" />
+                                ) : (
+                                    <User className="w-7 h-7 text-slate-300" />
+                                )}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-slate-800 font-black text-lg truncate leading-tight">{nickname || "Scanning..."}</p>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Protocol Session</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 右半部分：凭据展示区 (紧凑排列) */}
-                <div className="w-full md:w-[55%] p-8 bg-slate-50/30">
-                    <div className="flex items-center space-x-2 mb-6">
-                        <Key className="w-5 h-5 text-slate-400" />
-                        <h3 className="font-bold text-slate-700">Authentication Credentials</h3>
+                {/* Right: Data & Results */}
+                <div className="w-full lg:w-[60%] p-12 bg-white flex flex-col">
+                    <div className="flex items-center space-x-3 mb-8">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
+                            <Key className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight">Access Tokens</h3>
+                            <p className="text-slate-400 text-xs font-medium">Derived protocol credentials and session identifiers.</p>
+                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <CopyableInput label="Auth Code" value={authCode} placeholder="等待扫码下发..." />
-                        <CopyableInput label="Access Token" value={tokens?.access_token || ""} placeholder="等待换取..." />
-                        <CopyableInput label="Refresh Token" value={tokens?.refresh_token || ""} placeholder="等待换取..." />
-
-                        {/* OpenID 和 UnionID 并排显示节省空间 */}
-                        <div className="flex space-x-3">
-                            <div className="flex-1">
-                                <CopyableInput label="openid" value={tokens?.openid || ""} placeholder="等待换取..." />
-                            </div>
-                            <div className="flex-1">
-                                <CopyableInput label="unionid" value={tokens?.unionid || ""} placeholder="等待换取..." />
-                            </div>
+                    <div className="flex-1 space-y-2">
+                        <CopyableInput icon={Terminal} label="Authorization Code" value={authCode} placeholder="Awaiting manual scan..." />
+                        <CopyableInput icon={ShieldCheck} label="Access Token" value={tokens?.access_token || ""} placeholder="Waiting for code exchange..." />
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <CopyableInput icon={User} label="OpenID" value={tokens?.openid || ""} placeholder="Waiting..." />
+                            <CopyableInput icon={Fingerprint} label="UnionID" value={tokens?.unionid || ""} placeholder="Waiting..." />
                         </div>
+                        
+                        <div className="pt-2">
+                            <CopyableInput icon={RefreshCw} label="Refresh Token" value={tokens?.refresh_token || ""} placeholder="Waiting..." />
+                        </div>
+                    </div>
+
+                    {/* Footer Info */}
+                    <div className="mt-8 pt-8 border-t border-slate-50 flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-slate-300">
+                            <ShieldCheck className="w-4 h-4" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">End-to-End Encrypted Session</span>
+                        </div>
+                        <button 
+                            onClick={() => setShowLogs(!showLogs)}
+                            className="text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors flex items-center space-x-2"
+                        >
+                            <Terminal className="w-3.5 h-3.5" />
+                            <span>System Logs</span>
+                        </button>
                     </div>
                 </div>
             </motion.div>
 
-            {/* 终端日志切换与面板 (保持你之前的原样即可，为了精简回答这里省略了展开面板代码) */}
-            <div className="w-full mt-4 flex justify-end">
-                <button onClick={() => setShowLogs(!showLogs)} className="flex items-center space-x-2 text-sm text-slate-500 hover:text-emerald-600 bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200 transition-all">
-                    <Terminal className="w-4 h-4" />
-                    <span>{showLogs ? "隐藏详细日志" : "查看执行日志"}</span>
-                </button>
-            </div>
-
-            {/* 终端日志面板 */}
+            {/* Log Console Overlay */}
             <AnimatePresence>
                 {showLogs && (
                     <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="w-full mt-4 bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-slate-800"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="w-full mt-6 bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl border border-slate-800 ring-1 ring-white/10"
                     >
-                        <div className="bg-slate-950 px-4 py-2 flex items-center space-x-2">
-                            <div className="flex space-x-1.5">
-                                <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-                                <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-                                <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+                        <div className="bg-slate-950/50 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+                            <div className="flex items-center space-x-3">
+                                <div className="flex space-x-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                                </div>
+                                <span className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] ml-2">Console Output</span>
                             </div>
-                            <span className="text-slate-500 text-xs font-mono ml-2">weauth-core-stdout</span>
+                            <button onClick={() => setShowLogs(false)} className="text-slate-500 hover:text-white transition-colors">
+                                <Check className="w-4 h-4" />
+                            </button>
                         </div>
-                        <div className="p-4 h-48 overflow-y-auto font-mono text-sm space-y-1">
+                        <div className="p-6 h-64 overflow-y-auto font-mono text-xs space-y-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                             {logs.map((log, i) => (
-                                <div key={i} className="flex space-x-3">
-                                    <span className="text-slate-600 shrink-0">[{log.time}]</span>
-                                    {log.type === -1 ? (
-                                        <span className="text-red-400">{log.msg}</span>
-                                    ) : log.type === 1 || log.type === 3 ? (
-                                        <span className="text-blue-400/70 italic">[Binary Data Hidden]</span>
-                                    ) : (
-                                        <span className="text-emerald-400/90">{log.msg}</span>
-                                    )}
+                                <div key={i} className="flex space-x-4 group">
+                                    <span className="text-slate-600 shrink-0 font-medium tabular-nums opacity-50 group-hover:opacity-100 transition-opacity">{log.time}</span>
+                                    <div className="flex-1">
+                                        {log.type === -1 ? (
+                                            <span className="text-rose-400 font-medium tracking-tight">! ERROR: {log.msg}</span>
+                                        ) : log.type === 1 || log.type === 3 ? (
+                                            <span className="text-emerald-500/40 italic flex items-center space-x-2">
+                                                <Key className="w-3 h-3" />
+                                                <span>[PROTECTED BINARY DATA]</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-300 leading-relaxed">{log.msg}</span>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>

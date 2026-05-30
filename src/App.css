@@ -1,23 +1,26 @@
 @import "tailwindcss";
 
-
-/* 极客感网格背景 */
-.bg-grid-pattern {
-  background-size: 50px 50px;
-  background-image:
-          linear-gradient(to right, rgba(16, 185, 129, 0.3) 1px, transparent 1px),
-          linear-gradient(to bottom, rgba(16, 185, 129, 0.3) 1px, transparent 1px);
-  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
-  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
-  transition: transform 0.2s ease-out;
-  transform-style: preserve-3d;
-}
-
 /* 基础样式覆盖 */
 @layer base {
   body {
     margin: 0;
-    overflow: hidden; /* 保证巨大的 logo 动画不会撑出滚动条 */
-    background-color: var(--color-slate-50); /* v4 支持直接使用内部变量 */
+    overflow-x: hidden;
+    background-color: #fafafa;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   }
+}
+
+/* 隐藏滚动条但保留功能 (可选) */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }
