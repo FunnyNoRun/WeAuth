@@ -23,4 +23,4 @@ This branch contains the source code for the official **WeAuth** landing page an
 3. The GitHub Action will automatically build and deploy to your Cloudflare Pages project.
 
 ---
-Maintained by [FunnyNoRun](https://github.com/FunnyNoRun)
+Maintained by [FunnyNoRun](https://github.com/FunnyNoRun) 
