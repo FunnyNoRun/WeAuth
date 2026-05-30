@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X, Sun, Moon, Check, Activity } from "lucide-react";
+import { ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X, Sun, Moon, Check, Activity, ChevronDown, Settings2 } from "lucide-react";
 import { FaGithub, FaQq } from "react-icons/fa";
 import { SharedLayout } from "./components/SharedLayout";
 import { useTheme } from "./context/ThemeContext";
@@ -106,6 +106,8 @@ const Navbar = () => (
 export default function App() {
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
+    const [showProxyMenu, setShowProxyMenu] = useState(false);
+    const proxyMenuRef = useRef<HTMLDivElement>(null);
     
     // Proxy logic
     const proxies = useMemo(() => [
@@ -142,7 +144,6 @@ export default function App() {
             }
             const start = Date.now();
             try {
-                // Test latency by fetching the proxy root or a known small asset
                 await fetch(proxy.url, { mode: 'no-cors', cache: 'no-cache' });
                 results[proxy.name] = Date.now() - start;
             } catch (e) {
@@ -152,7 +153,6 @@ export default function App() {
 
         setLatencies(results);
         
-        // Auto-select fastest excluding Direct if it's too slow or error
         const validProxies = proxies.filter(p => typeof results[p.name] === 'number' && results[p.name] !== 0);
         if (validProxies.length > 0) {
             const fastest = validProxies.reduce((prev, curr) => 
@@ -172,7 +172,6 @@ export default function App() {
 
     useEffect(() => {
         testLatency();
-        // Device detection
         const checkMobile = () => {
             const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
             return /android|iphone|ipad|ipod/i.test(userAgent.toLowerCase());
@@ -181,31 +180,19 @@ export default function App() {
         const mobile = checkMobile();
         setIsMobile(mobile);
 
-        // Deep Link logic
         const params = new URLSearchParams(window.location.search);
         const uuid = params.get("uuid");
 
         if (uuid && !mobile) {
             const deepLink = `weauth://wechat-oauth?uuid=${uuid}`;
             let hasBlurred = false;
-
-            const handleBlur = () => {
-                hasBlurred = true;
-            };
-
+            const handleBlur = () => { hasBlurred = true; };
             window.addEventListener('blur', handleBlur);
-
-            // Attempt to redirect
             window.location.href = deepLink;
-
-            // Timeout to show prompt if app didn't open
             const timer = setTimeout(() => {
-                if (!hasBlurred) {
-                    setShowInstallPrompt(true);
-                }
+                if (!hasBlurred) setShowInstallPrompt(true);
                 window.removeEventListener('blur', handleBlur);
             }, 2500);
-
             return () => {
                 clearTimeout(timer);
                 window.removeEventListener('blur', handleBlur);
@@ -213,15 +200,23 @@ export default function App() {
         }
     }, []);
 
-    // Auto-hide prompt after 10 seconds
     useEffect(() => {
         if (showInstallPrompt) {
-            const timer = setTimeout(() => {
-                setShowInstallPrompt(false);
-            }, 10000);
+            const timer = setTimeout(() => { setShowInstallPrompt(false); }, 10000);
             return () => clearTimeout(timer);
         }
     }, [showInstallPrompt]);
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (proxyMenuRef.current && !proxyMenuRef.current.contains(event.target as Node)) {
+                setShowProxyMenu(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     return (
         <SharedLayout>
@@ -296,60 +291,91 @@ export default function App() {
                                 transition={{ delay: 0.8 }} 
                                 className="flex flex-col items-center md:items-start space-y-6 w-full"
                             >
-                                <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full">
-                                    <a
-                                        href={downloadUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="group w-full sm:w-auto relative px-10 py-5 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 hover:-translate-y-1 transition-all flex items-center justify-center space-x-3 overflow-hidden"
-                                    >
-                                        <Download className="w-5 h-5" />
-                                        <span>立即下载 WeAuth</span>
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                                    </a>
+                                <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full relative">
+                                    <div className="flex items-stretch group" onMouseEnter={() => setShowProxyMenu(true)}>
+                                        <a
+                                            href={downloadUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="group relative px-10 py-5 bg-emerald-600 text-white font-bold rounded-l-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 hover:-translate-y-0.5 transition-all flex items-center justify-center space-x-3 overflow-hidden border-r border-emerald-500/30"
+                                        >
+                                            <Download className="w-5 h-5" />
+                                            <span>立即下载 WeAuth</span>
+                                        </a>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowProxyMenu(!showProxyMenu);
+                                            }}
+                                            className="px-4 py-5 bg-emerald-600 text-white rounded-r-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-500 hover:-translate-y-0.5 transition-all flex items-center justify-center border-l border-emerald-700/30 cursor-pointer"
+                                        >
+                                            <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${showProxyMenu ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        {/* Proxy Popover */}
+                                        <AnimatePresence>
+                                            {showProxyMenu && (
+                                                <motion.div 
+                                                    ref={proxyMenuRef}
+                                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                    className="absolute top-full left-0 mt-4 w-72 md:w-80 p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[60] backdrop-blur-xl"
+                                                >
+                                                    <div className="flex items-center justify-between mb-4 px-1">
+                                                        <div className="flex items-center space-x-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                            <Activity className="w-3 h-3" />
+                                                            <span>下载线路优化</span>
+                                                        </div>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); testLatency(); }}
+                                                            disabled={isTesting}
+                                                            className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50 font-bold"
+                                                        >
+                                                            {isTesting ? "检测中..." : "重新测速"}
+                                                        </button>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 gap-1 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+                                                        {proxies.map((proxy) => (
+                                                            <button
+                                                                key={proxy.name}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedProxy(proxy);
+                                                                    setShowProxyMenu(false);
+                                                                }}
+                                                                className={`flex items-center justify-between p-3 rounded-xl transition-all cursor-pointer ${
+                                                                    selectedProxy.name === proxy.name 
+                                                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" 
+                                                                    : "hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400"
+                                                                }`}
+                                                            >
+                                                                <div className="flex flex-col items-start">
+                                                                    <span className="text-xs font-bold">{proxy.name}</span>
+                                                                    <span className="text-[10px] opacity-60">
+                                                                        {latencies[proxy.name] === "error" ? "超时" : 
+                                                                         latencies[proxy.name] !== undefined ? `${latencies[proxy.name]}ms` : "--"}
+                                                                    </span>
+                                                                </div>
+                                                                {selectedProxy.name === proxy.name && <Check className="w-4 h-4" />}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                                        <p className="text-[10px] text-slate-400 leading-tight">
+                                                            当前选中: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedProxy.name}</span>
+                                                            <br />
+                                                            如果下载缓慢，请尝试切换其他线路。
+                                                        </p>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
 
                                     <div className="flex items-center space-x-2 text-slate-400 dark:text-slate-500 font-medium">
                                         <Laptop className="w-4 h-4" />
                                         <span className="text-sm">支持 Windows x64</span>
-                                    </div>
-                                </div>
-
-                                {/* Proxy Selector */}
-                                <div className="w-full max-w-2xl p-4 rounded-2xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-200 dark:border-slate-800">
-                                    <div className="flex items-center justify-between mb-3 px-1">
-                                        <div className="flex items-center space-x-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                            <Activity className="w-3 h-3" />
-                                            <span>下载线路优化 (选择最快线路)</span>
-                                        </div>
-                                        <button 
-                                            onClick={testLatency}
-                                            disabled={isTesting}
-                                            className="text-[10px] px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors disabled:opacity-50 cursor-pointer font-bold"
-                                        >
-                                            {isTesting ? "检测中..." : "重新测速"}
-                                        </button>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                        {proxies.map((proxy) => (
-                                            <button
-                                                key={proxy.name}
-                                                onClick={() => setSelectedProxy(proxy)}
-                                                className={`relative flex flex-col p-2 rounded-xl border transition-all cursor-pointer ${
-                                                    selectedProxy.name === proxy.name 
-                                                    ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500/50 text-emerald-700 dark:text-emerald-400 shadow-sm" 
-                                                    : "bg-white/50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between w-full">
-                                                    <span className="text-xs font-bold">{proxy.name}</span>
-                                                    {selectedProxy.name === proxy.name && <Check className="w-3 h-3" />}
-                                                </div>
-                                                <div className="text-[10px] mt-1 opacity-60 flex items-center justify-between">
-                                                    <span>{latencies[proxy.name] === "error" ? "超时" : 
-                                                     latencies[proxy.name] !== undefined ? `${latencies[proxy.name]}ms` : "--"}</span>
-                                                </div>
-                                            </button>
-                                        ))}
                                     </div>
                                 </div>
                             </motion.div>
