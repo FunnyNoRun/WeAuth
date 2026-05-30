@@ -145,7 +145,11 @@ pub fn run() {
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
-                app.deep_link().register_all().unwrap();
+                if let Err(e) = app.deep_link().register_all() {
+                    println!("[Deep Link] 注册失败: {:?}", e);
+                } else {
+                    println!("[Deep Link] 协议注册成功");
+                }
             }
 
             app.listen("deep-link://", |event| {
