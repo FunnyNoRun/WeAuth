@@ -111,6 +111,7 @@ export default function App() {
     const proxies = useMemo(() => [
         { name: "Direct", url: "" },
         { name: "GH-Proxy", url: "https://gh-proxy.com/" },
+        { name: "List", url: "https://ghproxylist.com/" },
         { name: "DPik", url: "https://github.dpik.top/" },
         { name: "Memory", url: "https://github-proxy.memory-echoes.cn/" },
         { name: "Felicity", url: "https://gh.felicity.ac.cn/" },
