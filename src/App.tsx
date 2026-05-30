@@ -108,6 +108,7 @@ export default function App() {
     const [isMobile, setIsMobile] = useState(false);
     const [showProxyMenu, setShowProxyMenu] = useState(false);
     const proxyMenuRef = useRef<HTMLDivElement>(null);
+    const menuTimerRef = useRef<number | null>(null);
     
     // Proxy logic
     const proxies = useMemo(() => [
@@ -218,6 +219,17 @@ export default function App() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const handleMouseEnter = () => {
+        if (menuTimerRef.current) window.clearTimeout(menuTimerRef.current);
+        setShowProxyMenu(true);
+    };
+
+    const handleMouseLeave = () => {
+        menuTimerRef.current = window.setTimeout(() => {
+            setShowProxyMenu(false);
+        }, 300); // Small delay to allow moving mouse to the menu
+    };
+
     return (
         <SharedLayout>
             <Navbar />
@@ -292,7 +304,11 @@ export default function App() {
                                 className="flex flex-col items-center md:items-start space-y-6 w-full"
                             >
                                 <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full relative">
-                                    <div className="flex items-stretch group" onMouseEnter={() => setShowProxyMenu(true)}>
+                                    <div 
+                                        className="flex items-stretch group" 
+                                        onMouseEnter={handleMouseEnter}
+                                        onMouseLeave={handleMouseLeave}
+                                    >
                                         <a
                                             href={downloadUrl}
                                             target="_blank"
@@ -320,6 +336,8 @@ export default function App() {
                                                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
                                                     className="absolute top-full left-0 mt-4 w-72 md:w-80 p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[60] backdrop-blur-xl"
                                                 >
                                                     <div className="flex items-center justify-between mb-4 px-1">

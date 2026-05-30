@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@theme {
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+}
+
+/* Tailwind 4 Dark Mode Class Strategy */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* 基础样式覆盖 */
 @layer base {
   body {
