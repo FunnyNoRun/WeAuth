@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int};
 use std::sync::{Arc, Mutex, OnceLock};
-use tauri::{AppHandle, Emitter, Listener};
+use tauri::{AppHandle, Emitter, Manager};
 use serde::{Deserialize, Serialize};
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
@@ -68,12 +68,10 @@ fn start_weauth_flow() -> Result<(), String> {
         *is_running = true;
     }
 
-    // 重置完成状态
     if let Some(completed) = AUTH_COMPLETED.get() {
         *completed.lock().unwrap() = false;
     }
 
-    // 在单独的线程中启动，避免DLL崩溃影响主进程
     std::thread::spawn(|| {
         unsafe {
             let res = StartAuthFlow();
@@ -86,7 +84,6 @@ fn start_weauth_flow() -> Result<(), String> {
                 }
             }
         }
-        // 执行完成后重置运行状态
         if let Some(running) = AUTH_RUNNING.get() {
             *running.lock().unwrap() = false;
         }
@@ -95,10 +92,9 @@ fn start_weauth_flow() -> Result<(), String> {
     Ok(())
 }
 
-// 新增：换取 Access Token 的命令
 #[tauri::command]
 async fn exchange_token(code: String) -> Result<TokenData, String> {
-    // 你的 AppID 和 Secret 放在这里（后端极度安全）
+    // 其实不是我的~~
     let appid = "wx5a2e1ff396785475";
     let secret = "cdb20f1be2d3cac7f46664c742937a54";
 
@@ -118,7 +114,6 @@ async fn exchange_token(code: String) -> Result<TokenData, String> {
         }
     }
 
-    // 标记认证完成，停止接收DLL事件
     if let Some(completed) = AUTH_COMPLETED.get() {
         *completed.lock().unwrap() = true;
     }
@@ -135,6 +130,13 @@ async fn exchange_token(code: String) -> Result<TokenData, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(webview) = app.get_webview_window("main") {
+                let _ = webview.show();
+                let _ = webview.set_focus();
+            }
+        }))
+
         .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             APP_HANDLE.set(app.handle().clone()).unwrap();
@@ -145,22 +147,27 @@ pub fn run() {
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
+
                 if let Err(e) = app.deep_link().register_all() {
                     println!("[Deep Link] 注册失败: {:?}", e);
-                } else {
-                    println!("[Deep Link] 协议注册成功");
                 }
-            }
 
-            app.listen("deep-link://", |event| {
-                let payload = event.payload();
-                println!("[Deep Link] 收到深链接: {:?}", payload);
-                
-                // 将深链接转发给前端
-                if let Some(app) = APP_HANDLE.get() {
-                    let _ = app.emit("weauth-deep-link", payload);
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    for url in urls {
+                        println!("[Deep Link] 冷启动收到 URL: {:?}", url);
+                        let _ = app.emit("weauth-deep-link", url.to_string());
+                    }
                 }
-            });
+
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        println!("[Deep Link] 运行中收到 URL: {:?}", url);
+                        if let Some(handle) = APP_HANDLE.get() {
+                            let _ = handle.emit("weauth-deep-link", url.to_string());
+                        }
+                    }
+                });
+            }
 
             Ok(())
         })

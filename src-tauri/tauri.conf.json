@@ -21,9 +21,11 @@
       "csp": null
     }
   },
-  "plugins": {
-    "deep-link": {
-      "schemes": ["weauth"]
+    "plugins": {
+      "deep-link": {
+        "desktop": {
+          "schemes": ["weauth"]
+        }
     }
   },
   "bundle": {
