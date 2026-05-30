@@ -106,12 +106,9 @@ pnpm tauri build
 
 ## 🙏 鸣谢
 
-### 鸣谢
+> 只有这里是手写的，前面的看看得了
 
-![GitHub Repo Card](https://githubcard.com/LagrangeDev/LagrangeV2.svg)
+**Claude**   **Gemini**
 
 ![GitHub Repo Card](https://githubcard.com/G5t4r/WeProtocol.svg)
 
-![GitHub Repo Card](https://githubcard.com/SnowLuma/SnowLuma.svg)
-
-<del>上面三个项目里面搬运了代码</del>
