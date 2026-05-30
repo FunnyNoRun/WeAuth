@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri"
+    "preview": "pnpm run build && wrangler dev",
+    "tauri": "tauri",
+    "deploy": "pnpm run build && wrangler deploy"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -19,6 +20,7 @@
     "react-icons": "^5.6.0"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.39.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
@@ -28,6 +30,7 @@
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "wrangler": "^4.95.0"
   }
 }
