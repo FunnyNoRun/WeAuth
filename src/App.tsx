@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X } from "lucide-react";
-import { FaGithub } from "react-icons/fa";
+import { FaGithub, FaQq } from "react-icons/fa";
 import { SharedLayout } from "./components/SharedLayout";
 
 const TypewriterText = ({ text }: { text: string }) => {
@@ -76,9 +76,13 @@ const Navbar = () => (
                 <span className="hidden sm:inline">GitHub</span>
             </a>
             <div className="h-4 w-[1px] bg-slate-200" />
-            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">
-                v0.1.0-alpha
-            </span>
+            <a 
+                href="tencent://groupwpa/?subcmd=all&param=7B2267726F757055696E223A2231303930333936303730222C2274696D655374616D70223A313738303130363535303734322C22617574684B6579223A223754665656686F5A6263454D446274564559716873337958385A4F374C337A68486A345944436C76636C574A2B744D324F5069626C412B5655774B6D5A4C6371222C2261757468223A22227D"
+                className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100 transition-colors"
+            >
+                <FaQq className="w-4 h-4" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">QQ 交流</span>
+            </a>
         </div>
     </motion.nav>
 );
