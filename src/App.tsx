@@ -167,7 +167,9 @@ export default function App() {
     };
 
     const downloadUrl = useMemo(() => {
-        const githubUrl = "https://github.com/FunnyNoRun/WeAuth/releases/latest/download/WeAuth_x64_en-US.msi";
+        const version = "0.2.0";
+        const filename = `weauth-tauri_${version}_x64-setup.exe`;
+        const githubUrl = `https://github.com/FunnyNoRun/WeAuth/releases/download/v${version}/${filename}`;
         return selectedProxy.url ? `${selectedProxy.url}${githubUrl}` : githubUrl;
     }, [selectedProxy]);
 
