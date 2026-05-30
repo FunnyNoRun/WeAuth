@@ -132,7 +132,10 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
             startFlow();
         }
 
-        return () => { unlisten.then(f => f()); };
+        return () => { 
+            unlisten.then(f => f()); 
+            unlistenDeepLink.then(f => f());
+        };
     }, []);
 
     return (

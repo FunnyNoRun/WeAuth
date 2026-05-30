@@ -149,7 +149,13 @@ pub fn run() {
             }
 
             app.listen("deep-link://", |event| {
-                println!("[Deep Link] 收到深链接: {:?}", event.payload());
+                let payload = event.payload();
+                println!("[Deep Link] 收到深链接: {:?}", payload);
+                
+                // 将深链接转发给前端
+                if let Some(app) = APP_HANDLE.get() {
+                    let _ = app.emit("weauth-deep-link", payload);
+                }
             });
 
             Ok(())
