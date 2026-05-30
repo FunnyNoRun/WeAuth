@@ -1,6 +1,6 @@
 [package]
 name = "weauth-tauri"
-version = "0.1.7"
+version = "0.2.0"
 description = "A Tauri App"
 authors = ["H3CoF6"]
 edition = "2021"

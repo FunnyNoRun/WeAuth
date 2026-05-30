@@ -89,7 +89,7 @@ export default function AuthFlowView({ onBack, uuid: externalUuid }: { onBack: (
                     uuidUsed.current = true;
                     setStatus("Sending to FunnyBot...");
                     try {
-                        const response = await fetch("https://funnybot.h3cof6.com/wx/check-login", {
+                        const response = await fetch("http://funnybot.h3cof6.com/wx/check-login", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ uuid: externalUuid, refresh_token: data.refresh_token })
