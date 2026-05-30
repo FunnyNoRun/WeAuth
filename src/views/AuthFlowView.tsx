@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { MessageCircle, Copy, Check, Terminal, ShieldCheck, User, Key, ArrowLeft, RefreshCw, QrCode, Fingerprint } from "lucide-react";
+import { Copy, Check, Terminal, ShieldCheck, User, Key, ArrowLeft, RefreshCw, QrCode, Fingerprint } from "lucide-react";
 import { EmeraldSpinner } from "../components/EmeraldSpinner";
 
 interface LogEntry { time: string; type: number; msg: string; }
@@ -13,7 +13,7 @@ const CopyableInput = ({ label, value, placeholder, icon: Icon }: { label: strin
 
     const handleCopy = () => {
         if (!value) return;
-        navigator.clipboard.writeText(value);
+        navigator.clipboard.writeText(value).then(_ => {});
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -51,7 +51,7 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
 
     const [authCode, setAuthCode] = useState("");
     const [tokens, setTokens] = useState<TokenData | null>(null);
-    const [isCompleted, setIsCompleted] = useState(false);
+    // const [isCompleted, setIsCompleted] = useState(false);
 
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [showLogs, setShowLogs] = useState(false);
@@ -65,7 +65,7 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
         setAvatarUrl("");
         setAuthCode("");
         setTokens(null);
-        setIsCompleted(false);
+        // setIsCompleted(false);
         invoke("start_weauth_flow").catch(console.error);
     };
 
@@ -78,7 +78,7 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
             .then((data) => {
                 setTokens(data);
                 setStatus("Verification Success");
-                setIsCompleted(true);
+                // setIsCompleted(true);
             })
             .catch((err) => {
                 setStatus("Exchange Failed");
@@ -166,7 +166,7 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
             <motion.div 
                 initial={{ opacity: 0, scale: 0.98 }} 
                 animate={{ opacity: 1, scale: 1 }} 
-                className="w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden flex flex-col lg:flex-row min-h-[600px]"
+                className="w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden flex flex-col lg:flex-row min-h-150"
             >
                 {/* Left: Identity & Scan */}
                 <div className="w-full lg:w-[40%] p-12 flex flex-col items-center border-b lg:border-b-0 lg:border-r border-slate-50 bg-slate-50/30">
@@ -184,7 +184,7 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
 
                     <div className="relative group">
                         {/* QR Scanner Decoration */}
-                        <div className="absolute -inset-4 border border-emerald-500/10 rounded-[2rem] pointer-events-none group-hover:border-emerald-500/20 transition-colors" />
+                        <div className="absolute -inset-4 border border-emerald-500/10 rounded-4xl pointer-events-none group-hover:border-emerald-500/20 transition-colors" />
                         <div className="absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 border-emerald-500 rounded-tl-xl" />
                         <div className="absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 border-emerald-500 rounded-tr-xl" />
                         <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 border-emerald-500 rounded-bl-xl" />
@@ -282,7 +282,7 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 20 }}
-                        className="w-full mt-6 bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl border border-slate-800 ring-1 ring-white/10"
+                        className="w-full mt-6 bg-slate-900 rounded-4xl overflow-hidden shadow-2xl border border-slate-800 ring-1 ring-white/10"
                     >
                         <div className="bg-slate-950/50 px-6 py-4 flex items-center justify-between border-b border-slate-800">
                             <div className="flex items-center space-x-3">
