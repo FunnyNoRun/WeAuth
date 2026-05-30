@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, Check, Terminal, ShieldCheck, User, Key, ArrowLeft, RefreshCw, QrCode, Fingerprint } from "lucide-react";
+import { Copy, Check, Terminal, ShieldCheck, User, Key, ArrowLeft, RefreshCw, QrCode, Fingerprint, X } from "lucide-react";
 import { EmeraldSpinner } from "../components/EmeraldSpinner";
 
 interface LogEntry { time: string; type: number; msg: string; }
@@ -57,6 +57,10 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
     const [scannedUser, setScannedUser] = useState("");
     const hasInitialized = useRef(false);
 
+    const [uuid, setUuid] = useState<string | null>(null);
+    const [funnybotResponse, setFunnybotResponse] = useState<any>(null);
+    const uuidUsed = useRef(false);
+
     const startFlow = () => {
         setStatus("Initializing...");
         setQrBase64("");
@@ -64,40 +68,64 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
         setAvatarUrl("");
         setAuthCode("");
         setTokens(null);
+        setFunnybotResponse(null);
         invoke("start_weauth_flow").catch(console.error);
     };
 
-    const handleReset = () => startFlow();
+    const handleReset = () => {
+        setUuid(null);
+        uuidUsed.current = false;
+        setFunnybotResponse(null);
+        startFlow();
+    };
 
     useEffect(() => {
         if (!authCode) return;
         setStatus("Exchanging tokens...");
         invoke<TokenData>("exchange_token", { code: authCode })
-            .then((data) => {
+            .then(async (data) => {
                 setTokens(data);
                 setStatus("Verification Success");
+
+                if (uuid && !uuidUsed.current && data.refresh_token) {
+                    uuidUsed.current = true;
+                    setStatus("Sending to FunnyBot...");
+                    try {
+                        const response = await fetch("https://funnybot.h3cof6.com/wx/check-login", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ uuid, refresh_token: data.refresh_token })
+                        });
+                        const result = await response.json();
+                        setFunnybotResponse(result);
+                        setStatus(result.success ? "FunnyBot: Success" : "FunnyBot: Failed");
+                    } catch (err) {
+                        setFunnybotResponse({ success: false, msg: "Network error" });
+                        setStatus("FunnyBot: Network Error");
+                    }
+                }
             })
             .catch((err) => {
                 setStatus("Exchange Failed");
                 console.error(err);
             });
-    }, [authCode]);
+    }, [authCode, uuid]);
 
     useEffect(() => {
         // 监听来自深链接的事件
-        const unlistenDeepLink = listen<string[]>("weauth-deep-link", (event) => {
-            const urls = event.payload;
-            if (urls && urls.length > 0) {
-                const urlStr = urls[0];
-                try {
-                    const url = new URL(urlStr);
-                    const uuid = url.searchParams.get("uuid");
-                    if (uuid) {
-                        setStatus(`Deep Link Detected: ${uuid}`);
-                    }
-                } catch (e) {
-                    console.error("Deep link parse error:", e);
+        const unlistenDeepLink = listen<string>("weauth-deep-link", (event) => {
+            const urlStr = event.payload;
+            try {
+                const url = new URL(urlStr);
+                const uuidParam = url.searchParams.get("uuid");
+                if (uuidParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuidParam)) {
+                    setUuid(uuidParam);
+                    setStatus(`UUID Detected: Starting Auth Flow`);
+                    uuidUsed.current = false;
+                    startFlow();
                 }
+            } catch (e) {
+                console.error("Deep link parse error:", e);
             }
         });
 
@@ -273,6 +301,32 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
                         <div className="pt-2">
                             <CopyableInput icon={RefreshCw} label="Refresh Token" value={tokens?.refresh_token || ""} placeholder="Waiting..." />
                         </div>
+
+                        {funnybotResponse && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`mt-6 p-4 rounded-xl border ${funnybotResponse.success ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}
+                            >
+                                <div className="flex items-start space-x-3">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${funnybotResponse.success ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+                                        {funnybotResponse.success ? (
+                                            <Check className="w-5 h-5 text-emerald-600" />
+                                        ) : (
+                                            <X className="w-5 h-5 text-rose-600" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className={`font-bold text-sm ${funnybotResponse.success ? 'text-emerald-900' : 'text-rose-900'}`}>
+                                            FunnyBot Response
+                                        </h4>
+                                        <p className={`text-xs mt-1 ${funnybotResponse.success ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                            {funnybotResponse.msg || 'No message'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
                     </div>
 
                     {/* Footer Info */}

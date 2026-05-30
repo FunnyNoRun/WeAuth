@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code2, Bot, ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X } from "lucide-react";
+import { Code2, Bot, ExternalLink, Zap, Shield, Cpu, ChevronRight, AlertCircle, X } from "lucide-react";
 import { FaGithub, FaQq } from "react-icons/fa";
 import { SharedLayout } from "./components/SharedLayout";
 import AuthFlowView from "./views/AuthFlowView";
@@ -79,7 +79,7 @@ const Navbar = ({ onHome }: { onHome: () => void }) => (
                 <FaGithub className="w-5 h-5" />
                 <span className="hidden sm:inline">GitHub</span>
             </a>
-            <div className="h-4 w-[1px] bg-slate-200" />
+            <div className="h-4 w-px bg-slate-200" />
             <a 
                 href="tencent://groupwpa/?subcmd=all&param=7B2267726F757055696E223A2231303930333936303730222C2274696D655374616D70223A313738303130363535303734322C22617574684B6579223A223754665656686F5A6263454D446274564559716873337958385A4F374C337A68486A345944436C76636C574A2B744D324F5069626C412B5655774B6D5A4C6371222C2261757468223A22227D"
                 className="flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100 transition-colors"
@@ -94,7 +94,7 @@ const Navbar = ({ onHome }: { onHome: () => void }) => (
 export default function App() {
     const [currentView, setCurrentView] = useState<"home" | "developer" | "bot">("home");
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
+    // const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
         // Device detection
@@ -104,9 +104,8 @@ export default function App() {
         };
         
         const mobile = checkMobile();
-        setIsMobile(mobile);
+        // setIsMobile(mobile);
 
-        // Deep Link logic
         const params = new URLSearchParams(window.location.search);
         const uuid = params.get("uuid");
 
@@ -159,7 +158,7 @@ export default function App() {
                             initial={{ opacity: 0, y: -20, x: "-50%" }}
                             animate={{ opacity: 1, y: 0, x: "-50%" }}
                             exit={{ opacity: 0, y: -20, x: "-50%" }}
-                            className="fixed top-24 left-1/2 z-[100] w-[calc(100%-3rem)] max-w-2xl p-4 bg-white/90 backdrop-blur-xl border border-amber-200 rounded-2xl flex items-start space-x-4 shadow-2xl"
+                            className="fixed top-24 left-1/2 z-100 w-[calc(100%-3rem)] max-w-2xl p-4 bg-white/90 backdrop-blur-xl border border-amber-200 rounded-2xl flex items-start space-x-4 shadow-2xl"
                         >
                             <div className="bg-amber-100 p-2 rounded-xl">
                                 <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
@@ -210,7 +209,7 @@ export default function App() {
                                             className="text-7xl font-black tracking-tight text-slate-900 leading-[0.9]"
                                         >
                                             Simplify Your <br />
-                                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">
+                                            <span className="text-transparent bg-clip-text bg-linear-to-r from-emerald-600 to-teal-500">
                                                 Auth Flow
                                             </span>
                                         </motion.h1>
@@ -238,7 +237,7 @@ export default function App() {
                                             <Code2 className="w-5 h-5" />
                                             <span>我是开发者</span>
                                             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                                            <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                                         </button>
 
                                         <button
@@ -269,7 +268,7 @@ export default function App() {
                                             className="absolute inset-0 border-2 border-emerald-500/20"
                                         />
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="p-8 bg-white rounded-[2rem] shadow-2xl border border-slate-100 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
+                                            <div className="p-8 bg-white rounded-4xl shadow-2xl border border-slate-100 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
                                                 <div className="w-48 h-48 md:w-64 md:h-64 bg-slate-50 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100">
                                                     <img src="/logo.png" alt="Logo" className="w-2/3 h-2/3 opacity-80 rounded-3xl" />
                                                 </div>
