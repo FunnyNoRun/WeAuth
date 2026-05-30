@@ -103,19 +103,41 @@ export default function App() {
 
         if (uuid && !mobile) {
             const deepLink = `weauth://wechat-oauth?uuid=${uuid}`;
-            
+            let hasBlurred = false;
+
+            const handleBlur = () => {
+                hasBlurred = true;
+            };
+
+            window.addEventListener('blur', handleBlur);
+
             // Attempt to redirect
             window.location.href = deepLink;
 
             // Timeout to show prompt if app didn't open
             const timer = setTimeout(() => {
-                setShowInstallPrompt(true);
+                if (!hasBlurred) {
+                    setShowInstallPrompt(true);
+                }
+                window.removeEventListener('blur', handleBlur);
             }, 2500);
 
+            return () => {
+                clearTimeout(timer);
+                window.removeEventListener('blur', handleBlur);
+            };
+        }
+        }, []);
+
+        // Auto-hide prompt after 10 seconds
+        useEffect(() => {
+        if (showInstallPrompt) {
+            const timer = setTimeout(() => {
+                setShowInstallPrompt(false);
+            }, 10000);
             return () => clearTimeout(timer);
         }
-    }, []);
-
+        }, [showInstallPrompt]);
     return (
         <SharedLayout>
             <Navbar />
