@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static AUTH_COMPLETED: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
 static AUTH_RUNNING: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();
+static STARTUP_URL: OnceLock<Arc<Mutex<Option<String>>>> = OnceLock::new();
 
 #[link(name = "weauth", kind = "raw-dylib")]
 extern "C" {
@@ -126,22 +127,48 @@ async fn exchange_token(code: String) -> Result<TokenData, String> {
     })
 }
 
+#[tauri::command]
+fn get_startup_url() -> Option<String> {
+    if let Some(startup_url) = STARTUP_URL.get() {
+        startup_url.lock().unwrap().take()
+    } else {
+        None
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            if let Err(e) = std::env::set_current_dir(exe_dir) {
+                println!("[Env] 切换工作目录失败: {:?}", e);
+            } else {
+                println!("[Env] 工作目录已成功修正为: {:?}", exe_dir);
+            }
+        }
+    }
+
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(webview) = app.get_webview_window("main") {
                 let _ = webview.show();
                 let _ = webview.set_focus();
             }
-        }))
 
+            if let Some(url) = argv.iter().find(|arg| arg.starts_with("weauth://")) {
+                println!("[Deep Link] 热启动拦截到 URL: {}", url);
+                let _ = app.emit("weauth-deep-link", url.clone());
+            }
+        }))
         .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             APP_HANDLE.set(app.handle().clone()).unwrap();
             AUTH_COMPLETED.set(Arc::new(Mutex::new(false))).unwrap();
             AUTH_RUNNING.set(Arc::new(Mutex::new(false))).unwrap();
+            STARTUP_URL.set(Arc::new(Mutex::new(None))).unwrap();
             unsafe { RegisterCallback(auth_callback); }
 
             #[cfg(any(windows, target_os = "linux"))]
@@ -152,26 +179,19 @@ pub fn run() {
                     println!("[Deep Link] 注册失败: {:?}", e);
                 }
 
-                if let Ok(Some(urls)) = app.deep_link().get_current() {
-                    for url in urls {
-                        println!("[Deep Link] 冷启动收到 URL: {:?}", url);
-                        let _ = app.emit("weauth-deep-link", url.to_string());
+
+                let args: Vec<String> = std::env::args().collect();
+                if let Some(url) = args.iter().find(|arg| arg.starts_with("weauth://")) {
+                    println!("[Deep Link] 冷启动原生检测到 URL: {}", url);
+                    if let Some(startup_url) = STARTUP_URL.get() {
+                        *startup_url.lock().unwrap() = Some(url.clone());
                     }
                 }
-
-                app.deep_link().on_open_url(move |event| {
-                    for url in event.urls() {
-                        println!("[Deep Link] 运行中收到 URL: {:?}", url);
-                        if let Some(handle) = APP_HANDLE.get() {
-                            let _ = handle.emit("weauth-deep-link", url.to_string());
-                        }
-                    }
-                });
             }
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_weauth_flow, exchange_token])
+        .invoke_handler(tauri::generate_handler![start_weauth_flow, exchange_token, get_startup_url])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

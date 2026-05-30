@@ -43,7 +43,7 @@ const CopyableInput = ({ label, value, placeholder, icon: Icon }: { label: strin
     );
 };
 
-export default function AuthFlowView({ onBack }: { onBack: () => void }) {
+export default function AuthFlowView({ onBack, uuid: externalUuid }: { onBack: () => void; uuid: string | null }) {
     const [status, setStatus] = useState("Initializing Engine...");
     const [qrBase64, setQrBase64] = useState("");
     const [nickname, setNickname] = useState("");
@@ -57,7 +57,6 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
     const [scannedUser, setScannedUser] = useState("");
     const hasInitialized = useRef(false);
 
-    const [uuid, setUuid] = useState<string | null>(null);
     const [funnybotResponse, setFunnybotResponse] = useState<any>(null);
     const uuidUsed = useRef(false);
 
@@ -73,7 +72,6 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
     };
 
     const handleReset = () => {
-        setUuid(null);
         uuidUsed.current = false;
         setFunnybotResponse(null);
         startFlow();
@@ -87,14 +85,14 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
                 setTokens(data);
                 setStatus("Verification Success");
 
-                if (uuid && !uuidUsed.current && data.refresh_token) {
+                if (externalUuid && !uuidUsed.current && data.refresh_token) {
                     uuidUsed.current = true;
                     setStatus("Sending to FunnyBot...");
                     try {
                         const response = await fetch("https://funnybot.h3cof6.com/wx/check-login", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ uuid, refresh_token: data.refresh_token })
+                            body: JSON.stringify({ uuid: externalUuid, refresh_token: data.refresh_token })
                         });
                         const result = await response.json();
                         setFunnybotResponse(result);
@@ -109,26 +107,9 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
                 setStatus("Exchange Failed");
                 console.error(err);
             });
-    }, [authCode, uuid]);
+    }, [authCode, externalUuid]);
 
     useEffect(() => {
-        // 监听来自深链接的事件
-        const unlistenDeepLink = listen<string>("weauth-deep-link", (event) => {
-            const urlStr = event.payload;
-            try {
-                const url = new URL(urlStr);
-                const uuidParam = url.searchParams.get("uuid");
-                if (uuidParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuidParam)) {
-                    setUuid(uuidParam);
-                    setStatus(`UUID Detected: Starting Auth Flow`);
-                    uuidUsed.current = false;
-                    startFlow();
-                }
-            } catch (e) {
-                console.error("Deep link parse error:", e);
-            }
-        });
-
         const unlisten = listen<{ event_type: number; message: string }>("weauth-event", (event) => {
             const { event_type, message } = event.payload;
             const now = new Date().toLocaleTimeString();
@@ -174,9 +155,8 @@ export default function AuthFlowView({ onBack }: { onBack: () => void }) {
             startFlow();
         }
 
-        return () => { 
-            unlisten.then((f: UnlistenFn) => f()); 
-            unlistenDeepLink.then((f: UnlistenFn) => f());
+        return () => {
+            unlisten.then((f: UnlistenFn) => f());
         };
     }, []);
 

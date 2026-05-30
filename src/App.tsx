@@ -4,6 +4,8 @@ import { Code2, Bot, ExternalLink, Zap, Shield, Cpu, ChevronRight, AlertCircle, 
 import { FaGithub, FaQq } from "react-icons/fa";
 import { SharedLayout } from "./components/SharedLayout";
 import AuthFlowView from "./views/AuthFlowView";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 
 const TypewriterText = ({ text }: { text: string }) => {
     const [displayedText, setDisplayedText] = useState("");
@@ -94,48 +96,38 @@ const Navbar = ({ onHome }: { onHome: () => void }) => (
 export default function App() {
     const [currentView, setCurrentView] = useState<"home" | "developer" | "bot">("home");
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
-    // const [isMobile, setIsMobile] = useState(false);
+    const [deepLinkUuid, setDeepLinkUuid] = useState<string | null>(null);
+
+    const handleDeepLink = (urlStr: string) => {
+        try {
+            const cleanUrl = urlStr.replace(/"/g, "").trim();
+            console.log("前端正在解析清洗后的 URL:", cleanUrl);
+
+            const url = new URL(cleanUrl);
+            const uuidParam = url.searchParams.get("uuid");
+            if (uuidParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuidParam)) {
+                setDeepLinkUuid(uuidParam);
+                setCurrentView("developer");
+            }
+        } catch (e) {
+            console.error("Deep link parse error:", e);
+        }
+    };
 
     useEffect(() => {
-        // Device detection
-        const checkMobile = () => {
-            const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-            return /android|iphone|ipad|ipod/i.test(userAgent.toLowerCase());
-        };
-        
-        const mobile = checkMobile();
-        // setIsMobile(mobile);
+        // 冷启动：主动向后端索要启动时的 URL
+        invoke<string | null>("get_startup_url").then((url) => {
+            if (url) handleDeepLink(url);
+        }).catch(() => {});
 
-        const params = new URLSearchParams(window.location.search);
-        const uuid = params.get("uuid");
+        // 热启动：全局监听深链接事件
+        const unlisten = listen<string>("weauth-deep-link", (event) => {
+            handleDeepLink(event.payload);
+        });
 
-        if (uuid && !mobile) {
-            const deepLink = `weauth://wechat-oauth?uuid=${uuid}`;
-            let hasBlurred = false;
-
-            const handleBlur = () => {
-                hasBlurred = true;
-            };
-
-            window.addEventListener('blur', handleBlur);
-
-            // Attempt to redirect
-            window.location.href = deepLink;
-
-            // Timeout to show prompt if app didn't open
-            const timer = setTimeout(() => {
-                if (!hasBlurred) {
-                    setShowInstallPrompt(true);
-                }
-                window.removeEventListener('blur', handleBlur);
-            }, 2500);
-
-            return () => {
-                clearTimeout(timer);
-                window.removeEventListener('blur', handleBlur);
-            };
-        }
+        return () => { unlisten.then(f => f()); };
     }, []);
+
 
     // Auto-hide prompt after 10 seconds
     useEffect(() => {
@@ -316,7 +308,7 @@ export default function App() {
                             exit={{ opacity: 0, x: -20 }}
                             className="w-full"
                         >
-                            <AuthFlowView onBack={() => setCurrentView("home")} />
+                            <AuthFlowView onBack={() => setCurrentView("home")} uuid={deepLinkUuid} />
                         </motion.div>
                     )}
 
