@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X, Sun, Moon, Check, Activity, ChevronDown, Settings2 } from "lucide-react";
+import { ExternalLink, Zap, Shield, Cpu, ChevronRight, Download, Laptop, AlertCircle, X, Sun, Moon, Check, Activity, ChevronDown, Settings2, Globe } from "lucide-react";
 import { FaGithub, FaQq } from "react-icons/fa";
 import { SharedLayout } from "./components/SharedLayout";
 import { useTheme } from "./context/ThemeContext";
@@ -227,7 +227,7 @@ export default function App() {
     const handleMouseLeave = () => {
         menuTimerRef.current = window.setTimeout(() => {
             setShowProxyMenu(false);
-        }, 300); // Small delay to allow moving mouse to the menu
+        }, 300);
     };
 
     return (
@@ -338,23 +338,25 @@ export default function App() {
                                                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                                     onMouseEnter={handleMouseEnter}
                                                     onMouseLeave={handleMouseLeave}
-                                                    className="absolute top-full left-0 mt-4 w-72 md:w-80 p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[60] backdrop-blur-xl"
+                                                    className="absolute top-full left-0 mt-3 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[60] overflow-hidden backdrop-blur-xl"
                                                 >
-                                                    <div className="flex items-center justify-between mb-4 px-1">
-                                                        <div className="flex items-center space-x-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                                            <Activity className="w-3 h-3" />
-                                                            <span>下载线路优化</span>
+                                                    <div className="p-3 bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                                        <div className="flex items-center space-x-2 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.1em]">
+                                                            <Globe className="w-3 h-3" />
+                                                            <span>下载线路</span>
                                                         </div>
                                                         <button 
                                                             onClick={(e) => { e.stopPropagation(); testLatency(); }}
                                                             disabled={isTesting}
-                                                            className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50 font-bold"
+                                                            className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 font-bold disabled:opacity-50 flex items-center space-x-1"
                                                         >
-                                                            {isTesting ? "检测中..." : "重新测速"}
+                                                            <Activity className={`w-2.5 h-2.5 ${isTesting ? 'animate-pulse' : ''}`} />
+                                                            <span>{isTesting ? "测速中" : "测速"}</span>
                                                         </button>
                                                     </div>
-                                                    <div className="grid grid-cols-1 gap-1 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
-                                                        {proxies.map((proxy) => (
+
+                                                    <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                                                        {proxies.map((proxy, idx) => (
                                                             <button
                                                                 key={proxy.name}
                                                                 onClick={(e) => {
@@ -362,29 +364,40 @@ export default function App() {
                                                                     setSelectedProxy(proxy);
                                                                     setShowProxyMenu(false);
                                                                 }}
-                                                                className={`flex items-center justify-between p-3 rounded-xl transition-all cursor-pointer ${
+                                                                className={`w-full flex items-center justify-between px-4 py-3 transition-all cursor-pointer border-b border-slate-50 dark:border-slate-800/50 last:border-0 ${
                                                                     selectedProxy.name === proxy.name 
-                                                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" 
-                                                                    : "hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400"
+                                                                    ? "bg-emerald-50/50 dark:bg-emerald-500/5 text-emerald-700 dark:text-emerald-400" 
+                                                                    : "hover:bg-slate-50 dark:hover:bg-slate-800/30 text-slate-600 dark:text-slate-300"
                                                                 }`}
                                                             >
-                                                                <div className="flex flex-col items-start">
-                                                                    <span className="text-xs font-bold">{proxy.name}</span>
-                                                                    <span className="text-[10px] opacity-60">
-                                                                        {latencies[proxy.name] === "error" ? "超时" : 
-                                                                         latencies[proxy.name] !== undefined ? `${latencies[proxy.name]}ms` : "--"}
-                                                                    </span>
+                                                                <div className="flex flex-col items-start gap-0.5">
+                                                                    <span className="text-sm font-bold tracking-tight">{proxy.name}</span>
+                                                                    <div className="flex items-center space-x-1.5">
+                                                                        <div className={`w-1.5 h-1.5 rounded-full ${
+                                                                            latencies[proxy.name] === "error" ? "bg-red-400" :
+                                                                            (latencies[proxy.name] as number) < 300 ? "bg-emerald-400" :
+                                                                            (latencies[proxy.name] as number) < 800 ? "bg-amber-400" : "bg-slate-400"
+                                                                        }`} />
+                                                                        <span className="text-[10px] font-medium opacity-50">
+                                                                            {latencies[proxy.name] === "error" ? "Timeout" : 
+                                                                             latencies[proxy.name] !== undefined ? `${latencies[proxy.name]}ms` : "Pending"}
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
-                                                                {selectedProxy.name === proxy.name && <Check className="w-4 h-4" />}
+                                                                {selectedProxy.name === proxy.name && (
+                                                                    <div className="w-5 h-5 rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center">
+                                                                        <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
+                                                                    </div>
+                                                                )}
                                                             </button>
                                                         ))}
                                                     </div>
-                                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                                        <p className="text-[10px] text-slate-400 leading-tight">
-                                                            当前选中: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedProxy.name}</span>
-                                                            <br />
-                                                            如果下载缓慢，请尝试切换其他线路。
-                                                        </p>
+                                                    
+                                                    <div className="p-2.5 bg-emerald-600/5 dark:bg-emerald-400/5 border-t border-emerald-100/50 dark:border-emerald-900/30">
+                                                        <div className="flex items-center space-x-2 text-[9px] text-emerald-800/60 dark:text-emerald-400/60 font-medium">
+                                                            <div className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                                                            <span>当前最优线路已自动识别</span>
+                                                        </div>
                                                     </div>
                                                 </motion.div>
                                             )}
